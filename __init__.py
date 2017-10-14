@@ -11,8 +11,10 @@ class PIDBoil(KettleController):
     a_p = Property.Number("P", True, 102, description="P Value of PID")
     b_i = Property.Number("I", True, 100, description="I Value of PID")
     c_d = Property.Number("D", True, 5, description="D Value of PID")
-    d_max_out = Property.Number("max. output %", True, 100, description="Power which is set above boil threshold")
-    e_boil = Property.Number("Boil Threshold", True, 80,description="Temperatre for Boil threshold. Full power mode!")
+    d_max_output_ramp = Property.Number("Max. Ramp Output %", True, 100, description="Ramp up power when above Max. PID Temperature")
+    e_max_pid_temp = Property.Number("Max. PID Temperature", True, 80,description="Temperature for Max PID threshold.")        
+    f_max_output_boil = Property.Number("Max. Boil Output %", True, 70, description="Max power when above Max. Boil Temperature")
+    g_max_boil_temp = Property.Number("Max. Boil Temperature", True, 80,description="Temperature for Max Boil threshold.")
 
     def stop(self):
         '''
@@ -31,13 +33,16 @@ class PIDBoil(KettleController):
         p = float(self.a_p)
         i = float(self.b_i)
         d = float(self.c_d)
-        maxout = float(self.d_max_out)
-        pid = PIDArduino(sampleTime, p, i, d, 0, maxout)
+        maxoutputramp = float(self.d_max_output_ramp)        
+        maxoutputboil = float(self.f_max_output_boil)
+        pid = PIDArduino(sampleTime, p, i, d, 0, maxoutputramp)
 
         while self.is_running():
-
-            if self.get_target_temp() >= float(self.e_boil):
-                self.heater_on(100)
+            if self.get_target_temp() >= float(self.e_max_pid_temp):
+                if self.get_temp() < float(self.g_max_boil_temp):
+                    self.heater_on(maxoutputramp)
+                else:
+                    self.heater_on(maxoutputboil)              
                 self.sleep(1)
             else:
                 heat_percent = pid.calc(self.get_temp(), self.get_target_temp())
