@@ -1,4 +1,4 @@
-# PID Logic with boil threshold and .
+# PID Logic with boil threshold and boil power reduction.
 
 If the target Temperature is above a configurable "Max. PID Temperature" threshold the PID will be ignored and heater is switched into boil mode. This is helpful if you use the same kettle for mashing and boiling.
 
