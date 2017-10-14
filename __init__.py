@@ -14,7 +14,7 @@ class PIDBoil(KettleController):
     d_max_output_ramp = Property.Number("Max. Ramp Output %", True, 100, description="Ramp up power when above Max. PID Temperature")
     e_max_pid_temp = Property.Number("Max. PID Temperature", True, 80,description="Temperature for Max PID threshold.")        
     f_max_output_boil = Property.Number("Max. Boil Output %", True, 70, description="Max power when above Max. Boil Temperature")
-    g_max_boil_temp = Property.Number("Max. Boil Temperature", True, 80,description="Temperature for Max Boil threshold.")
+    g_max_boil_temp = Property.Number("Max. Boil Temperature", True, 98,description="Temperature for Max Boil threshold.")
 
     def stop(self):
         '''
