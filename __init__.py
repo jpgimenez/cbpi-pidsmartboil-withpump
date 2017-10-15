@@ -11,7 +11,7 @@ class PIDBoil(KettleController):
     a_p = Property.Number("P", True, 102, description="P Value of PID")
     b_i = Property.Number("I", True, 100, description="I Value of PID")
     c_d = Property.Number("D", True, 5, description="D Value of PID")
-    d_max_output_ramp = Property.Number("Max. Ramp Output %", True, 100, description="Ramp up power when above Max. PID Temperature")
+    d_max_output = Property.Number("Max. Output %", True, 100, description="Max power for PID and Ramp up.")
     e_max_pid_temp = Property.Number("Max. PID Temperature", True, 80,description="Temperature for Max PID threshold.")        
     f_max_output_boil = Property.Number("Max. Boil Output %", True, 70, description="Max power when above Max. Boil Temperature")
     g_max_boil_temp = Property.Number("Max. Boil Temperature", True, 98,description="Temperature for Max Boil threshold.")
@@ -29,27 +29,35 @@ class PIDBoil(KettleController):
     def run(self):
 
         sampleTime = 5
-        wait_time = 5
+        wait_time = 5        
         p = float(self.a_p)
         i = float(self.b_i)
         d = float(self.c_d)
-        maxoutputramp = float(self.d_max_output_ramp)        
+        
+        maxoutput = float(self.d_max_output)          
+        maxtemppid = float(self.e_max_pid_temp)
+        
+        pid = PIDArduino(sampleTime, p, i, d, 0, maxoutput)
+        
         maxoutputboil = float(self.f_max_output_boil)
-        pid = PIDArduino(sampleTime, p, i, d, 0, maxoutputramp)
-
+        maxtempboil = float(self.g_max_boil_temp)
+        
+        if maxtempboil > maxoutput:
+            raise ValueError('maxtempboil must be less than maxoutput')
+        
         while self.is_running():
-            if self.get_target_temp() >= float(self.e_max_pid_temp):
-                if self.get_temp() < float(self.g_max_boil_temp):
-                    self.heater_on(maxoutputramp)
-                else:
-                    self.heater_on(maxoutputboil)              
-                self.sleep(1)
-            else:
+            if self.get_target_temp() < maxtemppid: #PID                
                 heat_percent = pid.calc(self.get_temp(), self.get_target_temp())
-                heating_time = sampleTime * heat_percent / 100
-                wait_time = sampleTime - heating_time
-                self.heater_on(100)
-                self.sleep(heating_time)
+            elif self.get_temp() < maxtempboil: #Boil Ramp    
+                heat_percent = maxoutput
+            else: #Boil Sustain
+                heat_percent = maxoutputboil
+                
+            heating_time = sampleTime * heat_percent / 100
+            wait_time = sampleTime - heating_time
+            self.heater_on(100)
+            self.sleep(heating_time)            
+            if wait_time > 0:
                 self.heater_off()
                 self.sleep(wait_time)
 
