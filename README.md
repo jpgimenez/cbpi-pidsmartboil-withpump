@@ -9,7 +9,7 @@ In boil mode, the heater will be constantly on until the target Temperature is a
 * P - proportional value
 * I - integral value
 * D - derivative value
-* Max. Ramp Output - heater power when above Max. PID Temperature
-* Max. PID Temperature - Above this temperature the heater will be constantly on until Max. Boil Temperature is reached
-* Max. Boil Output - heater power when above Max. Boil Temperature
-* Max. Boil Temperature - Above this temperature the heater will use Max. Boil Output power
+* Max. Output - max heater power using PID or ramping up for boil
+* Max. PID Temperature - Above this target temperature the heater will quickly as possible reach Max. Boil Temperature
+* Max. Boil Output - heater power when Max. Boil Temperature is reached
+* Max. Boil Temperature - At or above this temperature and the heater will use Max. Boil Output power
