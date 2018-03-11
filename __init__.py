@@ -6,7 +6,7 @@ from modules.core.controller import KettleController
 from modules.core.props import Property
 
 @cbpi.controller
-class PIDBoil(KettleController):
+class PIDSmartBoilWithPump(KettleController):
 
     a_p = Property.Number("P", True, 102, description="P Value of PID")
     b_i = Property.Number("I", True, 100, description="I Value of PID")
@@ -15,6 +15,12 @@ class PIDBoil(KettleController):
     e_max_temp_pid = Property.Number("Max PID Target Temperature", True, 80,description="If Target Temperature is set above this, PID will be disabled and Boil Mode will turn on.")        
     f_max_output_boil = Property.Number("Max Boil Output %", True, 70, description="Power when Max Boil Temperature is reached.")
     g_max_temp_boil = Property.Number("Max Boil Temperature", True, 98,description="When Temperature reaches this, power will be reduced to Max Boil Output.")
+
+    h_internal_loop_time = Property.Number("Internal loop time", True, 0.2, description="In seconds, how quickly the internal loop will run, dictates maximum PID resolution.")
+
+    def __init__(self, *args, **kwds):
+        KettleController.__init__(self, *args, **kwds)
+        self._logger = logging.getLogger(type(self).__name__)
 
     def stop(self):
         '''
@@ -27,9 +33,7 @@ class PIDBoil(KettleController):
 
 
     def run(self):
-
-        sampleTime = 5
-        wait_time = 5        
+        wait_time = sampleTime = 5
         p = float(self.a_p)
         i = float(self.b_i)
         d = float(self.c_d)
@@ -41,11 +45,20 @@ class PIDBoil(KettleController):
         
         maxoutputboil = float(self.f_max_output_boil)
         maxtempboil = float(self.g_max_temp_boil)
-        
+
         if maxtempboil > maxoutput:
             raise ValueError('maxtempboil must be less than maxoutput')
-        
+
+        self.start_time = time.time()
+        internal_loop_time = float(self.h_internal_loop_time)
+        self._logger.debug(self.h_internal_loop_time)
+        self._logger.debug(internal_loop_time)
+
         while self.is_running():
+            self._logger.debug("calculation cycle")
+            inner_loop_now = calculation_loop_start = time.time()
+            next_calculation_time = calculation_loop_start + sampleTime
+
             if self.get_target_temp() < maxtemppid: #PID                
                 heat_percent = pid.calc(self.get_temp(), self.get_target_temp())
             elif self.get_temp() < maxtempboil: #Boil Ramp    
@@ -54,12 +67,26 @@ class PIDBoil(KettleController):
                 heat_percent = maxoutputboil
                 
             heating_time = sampleTime * heat_percent / 100
+            heat_to = calculation_loop_start + heating_time
+
             wait_time = sampleTime - heating_time
-            self.heater_on(100)
-            self.sleep(heating_time)            
-            if wait_time > 0:
-                self.heater_off()
-                self.sleep(wait_time)
+
+            while inner_loop_now < next_calculation_time:
+                self._logger.debug("inner loop cycle")
+
+                if inner_loop_now == calculation_loop_start and heating_time > 0:
+                    self._logger.debug("inner loop heat on")
+                    self.heater_on(100)
+
+                if inner_loop_now > calculation_loop_start and \
+                        inner_loop_now >= heat_to and \
+                        wait_time > 0:
+                    self._logger.debug("inner loop heat off")
+                    self.heater_off()
+                    wait_time = -1  # to stop off being called continuously
+
+                self.sleep(internal_loop_time)
+                inner_loop_now = time.time()
 
 # Based on Arduino PID Library
 # See https://github.com/br3ttb/Arduino-PID-Library
