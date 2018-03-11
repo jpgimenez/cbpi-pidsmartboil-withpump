@@ -68,10 +68,13 @@ class PIDSmartBoilWithPump(KettleController):
             self._logger.debug("calculation cycle")
             inner_loop_now = calculation_loop_start = time.time()
             next_calculation_time = calculation_loop_start + sampleTime
+            target_temp = self.get_target_temp()
+            current_temp = self.get_temp()
+            boil_mode = target_temp > maxtemppid
 
-            if self.get_target_temp() < maxtemppid: #PID                
-                heat_percent = pid.calc(self.get_temp(), self.get_target_temp())
-            elif self.get_temp() < maxtempboil: #Boil Ramp    
+            if not boil_mode: #PID
+                heat_percent = pid.calc(current_temp, target_temp)
+            elif current_temp < maxtempboil: #Boil Ramp
                 heat_percent = maxoutput
             else: #Boil Sustain
                 heat_percent = maxoutputboil
