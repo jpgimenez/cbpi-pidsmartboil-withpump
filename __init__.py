@@ -18,6 +18,10 @@ class PIDSmartBoilWithPump(KettleController):
 
     h_internal_loop_time = Property.Number("Internal loop time", True, 0.2, description="In seconds, how quickly the internal loop will run, dictates maximum PID resolution.")
 
+    j_mash_pump_rest_interval = Property.Number("Mash pump rest interval", True, 600, description="Rest the pump after this many seconds during the mash.")
+
+    j_mash_pump_rest_time = Property.Number("Mash pump rest time", True, 60, description="Rest the pump for this many seconds every rest interval.")
+
     def __init__(self, *args, **kwds):
         KettleController.__init__(self, *args, **kwds)
         self._logger = logging.getLogger(type(self).__name__)
@@ -54,6 +58,12 @@ class PIDSmartBoilWithPump(KettleController):
         self._logger.debug(self.h_internal_loop_time)
         self._logger.debug(internal_loop_time)
 
+        mash_pump_rest_interval = int(self.j_mash_pump_rest_interval)
+        mash_pump_rest_time = int(self.j_mash_pump_rest_time)
+
+        next_pump_start = now
+        next_pump_rest = None
+
         while self.is_running():
             self._logger.debug("calculation cycle")
             inner_loop_now = calculation_loop_start = time.time()
@@ -84,6 +94,15 @@ class PIDSmartBoilWithPump(KettleController):
                     self._logger.debug("inner loop heat off")
                     self.heater_off()
                     wait_time = -1  # to stop off being called continuously
+
+                if next_pump_start and inner_loop_now >= next_pump_start:
+                    self._logger.debug("starting pump")
+                    next_pump_start = None
+                    next_pump_rest = inner_loop_now + mash_pump_rest_interval
+                elif next_pump_rest and inner_loop_now >= next_pump_rest:
+                    self._logger.debug("resting pump")
+                    next_pump_rest = None
+                    next_pump_start = inner_loop_now + mash_pump_rest_time
 
                 self.sleep(internal_loop_time)
                 inner_loop_now = time.time()
