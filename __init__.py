@@ -24,9 +24,25 @@ class PIDSmartBoilWithPump(KettleController):
 
     k_pump_max_temp = Property.Number("Pump maximum temperature", True, 75, description="The pump will be switched off after the boil reaches this temperature.")
 
+
     def __init__(self, *args, **kwds):
         KettleController.__init__(self, *args, **kwds)
         self._logger = logging.getLogger(type(self).__name__)
+
+
+    @cbpi.try_catch(None)
+    def agitator_on(self):
+        k = self.api.cache.get("kettle").get(self.kettle_id)
+        if k.agitator is not None:
+            self.actor_on(power=100, id=int(k.agitator))
+
+
+    @cbpi.try_catch(None)
+    def agitator_off(self):
+        k = self.api.cache.get("kettle").get(self.kettle_id)
+        if k.agitator is not None:
+            self.actor_off(int(k.agitator))
+
 
     def stop(self):
         '''
@@ -110,18 +126,22 @@ class PIDSmartBoilWithPump(KettleController):
                         self._logger.debug("further mash pump logic is disabled") 
                         next_pump_start = None
                         next_pump_rest = None
+                        self.agitator_off()
                     else:
                         self._logger.debug("pump restarted and auto off enabled")
                         pump_boil_auto_off_control_enabled = True
+                        self.agitator_off()
                 else:
                     if next_pump_start is not None and inner_loop_now >= next_pump_start:
                         self._logger.debug("starting pump")
                         next_pump_start = None
                         next_pump_rest = inner_loop_now + mash_pump_rest_interval
+                        self.agitator_on()
                     elif next_pump_rest is not None and inner_loop_now >= next_pump_rest:
                         self._logger.debug("resting pump")
                         next_pump_rest = None
                         next_pump_start = inner_loop_now + mash_pump_rest_time
+                        self.agitator_off()
 
                 self.sleep(internal_loop_time)
                 inner_loop_now = time.time()
