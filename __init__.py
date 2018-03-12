@@ -18,9 +18,11 @@ class PIDSmartBoilWithPump(KettleController):
 
     h_internal_loop_time = Property.Number("Internal loop time", True, 0.2, description="In seconds, how quickly the internal loop will run, dictates maximum PID resolution.")
 
-    j_mash_pump_rest_interval = Property.Number("Mash pump rest interval", True, 600, description="Rest the pump after this many seconds during the mash.")
+    i_mash_pump_rest_interval = Property.Number("Mash pump rest interval", True, 600, description="Rest the pump after this many seconds during the mash.")
 
     j_mash_pump_rest_time = Property.Number("Mash pump rest time", True, 60, description="Rest the pump for this many seconds every rest interval.")
+
+    k_pump_max_temp = Property.Number("Pump maximum temperature", True, 75, description="The pump will be switched off after the boil reaches this temperature.")
 
     def __init__(self, *args, **kwds):
         KettleController.__init__(self, *args, **kwds)
@@ -58,11 +60,14 @@ class PIDSmartBoilWithPump(KettleController):
         self._logger.debug(self.h_internal_loop_time)
         self._logger.debug(internal_loop_time)
 
-        mash_pump_rest_interval = int(self.j_mash_pump_rest_interval)
+        mash_pump_rest_interval = int(self.i_mash_pump_rest_interval)
         mash_pump_rest_time = int(self.j_mash_pump_rest_time)
 
-        next_pump_start = now
+        next_pump_start = 0
         next_pump_rest = None
+
+        pump_max_temp = int(self.k_pump_max_temp)
+        pump_boil_auto_off_control_enabled = True
 
         while self.is_running():
             self._logger.debug("calculation cycle")
@@ -98,14 +103,25 @@ class PIDSmartBoilWithPump(KettleController):
                     self.heater_off()
                     wait_time = -1  # to stop off being called continuously
 
-                if next_pump_start and inner_loop_now >= next_pump_start:
-                    self._logger.debug("starting pump")
-                    next_pump_start = None
-                    next_pump_rest = inner_loop_now + mash_pump_rest_interval
-                elif next_pump_rest and inner_loop_now >= next_pump_rest:
-                    self._logger.debug("resting pump")
-                    next_pump_rest = None
-                    next_pump_start = inner_loop_now + mash_pump_rest_time
+                if boil_mode:
+                    if current_temp > pump_max_temp and pump_boil_auto_off_control_enabled:
+                        self._logger.debug("pump off and auto off disabled")
+                        pump_boil_auto_off_control_enabled = False
+                        self._logger.debug("further mash pump logic is disabled") 
+                        next_pump_start = None
+                        next_pump_rest = None
+                    else:
+                        self._logger.debug("pump restarted and auto off enabled")
+                        pump_boil_auto_off_control_enabled = True
+                else:
+                    if next_pump_start is not None and inner_loop_now >= next_pump_start:
+                        self._logger.debug("starting pump")
+                        next_pump_start = None
+                        next_pump_rest = inner_loop_now + mash_pump_rest_interval
+                    elif next_pump_rest is not None and inner_loop_now >= next_pump_rest:
+                        self._logger.debug("resting pump")
+                        next_pump_rest = None
+                        next_pump_start = inner_loop_now + mash_pump_rest_time
 
                 self.sleep(internal_loop_time)
                 inner_loop_now = time.time()
