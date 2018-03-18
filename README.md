@@ -1,6 +1,6 @@
 # PID Logic with Boil and Pump control
 
-Forked from [https://github.com/TChilderhose/cbpi-pidsmartboil](PID Smart Boil) by [https://github.com/TChilderhose](TChilderhose) and extended to be able to pulse the pump during the mash phase.
+Forked from [PID Smart Boil](https://github.com/TChilderhose/cbpi-pidsmartboil) by [TChilderhose](https://github.com/TChilderhose) and extended to be able to pulse the pump during the mash phase.
 
 These modficitions have been made so that CraftBeerPi3 would be better able to control single vessel breweries with integrated pumps.
 
