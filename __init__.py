@@ -99,7 +99,7 @@ class PIDSmartBoilWithPump(KettleController):
                 heat_percent = maxoutput
             else: #Boil Sustain
                 heat_percent = maxoutputboil
-                
+
             heating_time = sampleTime * heat_percent / 100
             heat_to = calculation_loop_start + heating_time
 
@@ -108,16 +108,27 @@ class PIDSmartBoilWithPump(KettleController):
             while inner_loop_now < next_calculation_time:
                 self._logger.debug("inner loop cycle")
 
-                if inner_loop_now == calculation_loop_start and heating_time > 0:
-                    self._logger.debug("inner loop heat on")
-                    self.heater_on(100)
+                heater_actor = self.api.cache.get("actors").get(int(self.heater))
+                if getattr(heater_actor.instance, 'power', None) is not None:
+                    # use PWM
+                    self._logger.debug("heater witn PWM support")
+                    self.actor_power(
+                        power=int(heat_percent),
+                        id=int(self.heater)
+                    )
+                else:
+                    # no PWM
+                    self._logger.debug("heater witnout PWM support")
+                    if inner_loop_now == calculation_loop_start and heating_time > 0:
+                        self._logger.debug("inner loop heat on")
+                        self.heater_on(100)
 
-                if inner_loop_now > calculation_loop_start and \
-                        inner_loop_now >= heat_to and \
-                        wait_time > 0:
-                    self._logger.debug("inner loop heat off")
-                    self.heater_off()
-                    wait_time = -1  # to stop off being called continuously
+                    if inner_loop_now > calculation_loop_start and \
+                            inner_loop_now >= heat_to and \
+                            wait_time > 0:
+                        self._logger.debug("inner loop heat off")
+                        self.heater_off()
+                        wait_time = -1  # to stop off being called continuously
 
                 if boil_mode:
                     if current_temp > pump_max_temp and pump_boil_auto_off_control_enabled:
