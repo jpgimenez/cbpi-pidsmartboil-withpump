@@ -13,6 +13,7 @@ class PIDSmartBoilWithPump(KettleController):
     c_d = Property.Number("D", True, 5, description="D Value of PID")
     d_max_output = Property.Number("Max Output %", True, 100, description="Max power for PID and Ramp up.")
     e_max_temp_pid = Property.Number("Max PID Target Temperature", True, 80,description="If Target Temperature is set above this, PID will be disabled and Boil Mode will turn on.")        
+
     f_max_output_boil = Property.Number("Max Boil Output %", True, 70, description="Power when Max Boil Temperature is reached.")
     g_max_temp_boil = Property.Number("Max Boil Temperature", True, 98,description="When Temperature reaches this, power will be reduced to Max Boil Output.")
 
@@ -68,9 +69,6 @@ class PIDSmartBoilWithPump(KettleController):
         maxoutputboil = float(self.f_max_output_boil)
         maxtempboil = float(self.g_max_temp_boil)
 
-        if maxtempboil > maxoutput:
-            raise ValueError('maxtempboil must be less than maxoutput')
-
         self.start_time = time.time()
         internal_loop_time = float(self.h_internal_loop_time)
         self._logger.debug(self.h_internal_loop_time)
@@ -111,14 +109,19 @@ class PIDSmartBoilWithPump(KettleController):
                 heater_actor = self.api.cache.get("actors").get(int(self.heater))
                 if getattr(heater_actor.instance, 'power', None) is not None:
                     # use PWM
-                    self._logger.debug("heater witn PWM support")
+                    self._logger.debug("heater with PWM support")
+                    power = int(heat_percent)
+                    if heater_actor.state == 0 and power:
+                        self.heater_on(power=power)
+                    if not power:
+                        self.heater_off()
                     self.actor_power(
-                        power=int(heat_percent),
-                        id=int(self.heater)
+                        power=power,
+                        id=heater_actor.id
                     )
                 else:
                     # no PWM
-                    self._logger.debug("heater witnout PWM support")
+                    self._logger.debug("heater without PWM support")
                     if inner_loop_now == calculation_loop_start and heating_time > 0:
                         self._logger.debug("inner loop heat on")
                         self.heater_on(100)
